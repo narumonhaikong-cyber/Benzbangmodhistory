@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BENZ BANGMOD - ตรวจสอบประวัติการซ่อม</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { background-color: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 420px; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h2 { color: #1e293b; margin: 0 0 5px 0; font-size: 24px; }
+        .header p { color: #64748b; font-size: 0.9em; margin: 0; }
+        .search-box { display: flex; gap: 8px; margin-bottom: 20px; }
+        input[type="text"] { flex: 1; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; outline: none; }
+        input[type="text"]:focus { border-color: #2563eb; }
+        button { background-color: #0d47a1; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        button:hover { background-color: #1565c0; }
+        .result-area { margin-top: 15px; }
+        .card { background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #0d47a1; padding: 15px; border-radius: 8px; margin-bottom: 12px; }
+        .card p { margin: 5px 0; color: #334155; font-size: 0.95em; }
+        .card-date { font-weight: bold; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 8px !important; }
+        .msg { text-align: center; color: #64748b; padding: 10px; }
+        .error { color: #dc2626; text-align: center; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+
+<div class="container">
+    <div class="header">
+        <h2>BENZ BANGMOD</h2>
+        <p>ตรวจสอบประวัติการซ่อมรถยนต์ออนไลน์</p>
+    </div>
+
+
+    <div class="search-box">
+        <input type="text" id="plateInput" placeholder="พิมพ์ทะเบียนรถ เช่น กข1234" onkeypress="handleKeyPress(event)">
+        <button onclick="searchData()">ค้นหา</button>
+    </div>
+
+
+    <div id="resultArea" class="result-area"></div>
+</div>
+
+
+<script>
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyllpQrhEve1KOdi2JoUm-zxKkvJ_qtKpT7BrteWZ-oyhLBXd2ygVE_6Ml9p9Sx-oym/exec';
+
+
+    function handleKeyPress(event) {
+        if (event.key === 'Enter') {
+            searchData();
+        }
+    }
+
+
+    function searchData() {
+        const plateInput = document.getElementById('plateInput').value.trim();
+        const resultArea = document.getElementById('resultArea');
+
+
+        if (!plateInput) {
+            resultArea.innerHTML = '<p class="error">กรุณากรอกทะเบียนรถก่อนครับ</p>';
+            return;
+        }
+
+
+        resultArea.innerHTML = '<p class="msg">กำลังค้นหาข้อมูล...</p>';
+
+
+        fetch(WEB_APP_URL)
+            .then(function(response) {
+                if (!response.ok) throw new Error('ไม่สามารถเชื่อมต่อฐานข้อมูลได้');
+                return response.json();
+            })
+            .then(function(rows) {
+                const cleanInput = cleanString(plateInput);
+
+
+                // ข้ามแถวที่ 1 (Header) และกรองข้อมูลเฉพาะทะเบียนที่ตรงกัน
+                const matches = rows.slice(1).filter(function(row) {
+                    if (!row || row.length === 0) return false;
+                    const cleanRowPlate = cleanString(String(row[0]));
+                    return cleanRowPlate === cleanInput;
+                });
+
+
+                if (matches.length > 0) {
+                    let html = '<p style="font-weight:bold; color:#1e293b;">พบประวัติการซ่อม (' + matches.length + ' รายการ):</p>';
+                    matches.reverse().forEach(function(row) {
+                        const date = row[1] ? formatDate(row[1]) : '-';
+                        const service = row[2] ? String(row[2]).trim() : '-';
+                        const mileage = row[3] ? String(row[3]).trim() : '-';
+                        const model = row[4] ? String(row[4]).trim() : '-'; // แก้ไขชื่อตัวแปรจาก modle -> model
+                        const vin = row[5] ? String(row[5]).trim() : '-';
+
+
+                        html += '<div class="card">' +
+                                    '<p class="card-date">🗓 วันที่: ' + date + '</p>' +
+                                    '<p>🛠 <strong>รายการ:</strong> ' + service + '</p>' +
+                                    '<p>🚗 <strong>เลขไมล์:</strong> ' + mileage + '</p>' +
+                                    '<p>🚘 <strong>รุ่นรถ:</strong> ' + model + '</p>' +
+                                    '<p>⛽ <strong>เลขถัง:</strong> ' + vin + '</p>' +
+                                '</div>';
+                    });
+                    resultArea.innerHTML = html;
+                } else {
+                    resultArea.innerHTML = '<p class="error">ไม่พบประวัติการซ่อมของทะเบียน "' + plateInput + '" ครับ</p>';
+                }
+            })
+            .catch(function(err) {
+                console.error(err);
+                resultArea.innerHTML = '<p class="error">เกิดข้อผิดพลาดในการดึงข้อมูล กรุณาลองใหม่อีกครั้ง</p>';
+            });
+    }
+
+
+    function cleanString(str) {
+        if (!str) return '';
+        return String(str).replace(/^"+|"+$/g, '').replace(/\s+/g, '').replace(/\r/g, '').toLowerCase();
+    }
+
+
+    function formatDate(rawDate) {
+        if (!rawDate) return '-';
+        const d = new Date(rawDate);
+        if (isNaN(d.getTime())) return String(rawDate).trim();
+        return d.toLocaleDateString('th-TH');
+    }
+</script>
+
+
+</body>
+</html>
